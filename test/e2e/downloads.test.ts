@@ -16,12 +16,11 @@ describe("Downloads (enabled)", true, [], {}, async () => {
     await fs.writeFile(tmpFilePath, "hello world")
 
     // Action
-    const fileInExplorer = await codeServerPage.page.waitForSelector("text=unique-file.txt")
-    await fileInExplorer.click({
+    await codeServerPage.page.locator("text=unique-file.txt").click({
       button: "right",
     })
 
-    expect(await codeServerPage.page.isVisible("text=Download...")).toBe(true)
+    await expect(codeServerPage.page.locator("text=Download...")).toBeVisible()
   })
 })
 
@@ -38,11 +37,10 @@ describe("Downloads (disabled)", true, ["--disable-file-downloads"], {}, async (
     await fs.writeFile(tmpFilePath, "hello world")
 
     // Action
-    const fileInExplorer = await codeServerPage.page.waitForSelector("text=unique-file.txt")
-    await fileInExplorer.click({
+    await codeServerPage.page.locator("text=unique-file.txt").click({
       button: "right",
     })
 
-    expect(await codeServerPage.page.isVisible("text=Download...")).toBe(false)
+    await expect(codeServerPage.page.locator("text=Download...")).toBeHidden()
   })
 })

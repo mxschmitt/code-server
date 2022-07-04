@@ -18,6 +18,9 @@ const config: PlaywrightTestConfig = {
   use: {
     headless: true, // Run tests in headless browsers.
     video: "retain-on-failure",
+    contextOptions: {
+      strictSelectors: true,
+    },
   },
 
   projects: [

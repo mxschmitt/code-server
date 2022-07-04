@@ -1,8 +1,8 @@
 import { field, Logger, logger } from "@coder/logger"
+import { Page, Locator } from "@playwright/test"
 import * as cp from "child_process"
 import { promises as fs } from "fs"
 import * as path from "path"
-import { Page } from "playwright"
 import * as util from "util"
 import { logError, plural } from "../../../src/common/util"
 import { onLine } from "../../../src/node/util"
@@ -43,7 +43,7 @@ export class CodeServer {
     name: string,
     private readonly args: string[],
     private readonly env: NodeJS.ProcessEnv,
-    private _workspaceDir: Promise<string> | string | undefined,
+    private _workspaceDir?: Promise<string> | string | undefined,
     private readonly entry = process.env.CODE_SERVER_TEST_ENTRY || ".",
   ) {
     this.logger = logger.named(name)
@@ -193,7 +193,7 @@ export class CodeServer {
  * process to spawn if it hasn't yet.
  */
 export class CodeServerPage {
-  private readonly editorSelector = "div.monaco-workbench"
+  public readonly editor = this.page.locator("div.monaco-workbench")
 
   constructor(
     private readonly codeServer: CodeServer,
@@ -243,7 +243,7 @@ export class CodeServerPage {
   async reloadUntilEditorIsReady() {
     this.codeServer.logger.debug("Waiting for editor to be ready...")
 
-    const editorIsVisible = await this.isEditorVisible()
+    const editorIsVisible = await this.editor.isVisible()
     let reloadCount = 0
 
     // Occassionally code-server timeouts in Firefox
@@ -258,7 +258,8 @@ export class CodeServerPage {
       // Give it an extra second just in case it's feeling extra slow
       await this.page.waitForTimeout(1000)
       reloadCount += 1
-      if (await this.isEditorVisible()) {
+      await this.editor.waitFor()
+      if (await this.editor.isVisible()) {
         this.codeServer.logger.debug(`editor became ready after ${reloadCount} reloads`)
         break
       }
@@ -266,20 +267,6 @@ export class CodeServerPage {
     }
 
     this.codeServer.logger.debug("Editor is ready!")
-  }
-
-  /**
-   * Checks if the editor is visible
-   */
-  async isEditorVisible() {
-    this.codeServer.logger.debug("Waiting for editor to be visible...")
-    // Make sure the editor actually loaded
-    await this.page.waitForSelector(this.editorSelector)
-    const visible = await this.page.isVisible(this.editorSelector)
-
-    this.codeServer.logger.debug(`Editor is ${visible ? "not visible" : "visible"}!`)
-
-    return visible
   }
 
   /**
@@ -295,7 +282,7 @@ export class CodeServerPage {
     await this.executeCommandViaMenus("Terminal: Focus Terminal")
 
     // Wait for terminal textarea to show up
-    await this.page.waitForSelector("textarea.xterm-helper-textarea")
+    await this.page.locator("textarea.xterm-helper-textarea").waitFor()
   }
 
   /**
@@ -311,14 +298,14 @@ export class CodeServerPage {
    * Wait for a tab to open for the specified file.
    */
   async waitForTab(file: string): Promise<void> {
-    await this.page.waitForSelector(`.tab :text("${path.basename(file)}")`)
+    await this.page.locator(`.tab :text("${path.basename(file)}")`).waitFor()
   }
 
   /**
    * See if the specified tab is open.
    */
-  async tabIsVisible(file: string): Promise<boolean> {
-    return this.page.isVisible(`.tab :text("${path.basename(file)}")`)
+  tabLocator(file: string): Locator {
+    return this.page.locator(`.tab :text("${path.basename(file)}")`)
   }
 
   /**
@@ -330,15 +317,16 @@ export class CodeServerPage {
 
     await this.page.keyboard.type(command)
 
-    await this.page.hover(`text=${command}`)
-    await this.page.click(`text=${command}`)
+    const commandLocator = this.page.locator(`text=${command}`)
+    await commandLocator.hover()
+    await commandLocator.click()
   }
 
   /**
    * Navigate through the items in the selector.  `open` is a function that will
    * open the menu/popup containing the items through which to navigation.
    */
-  async navigateItems(items: string[], selector: string, open?: (selector: string) => void): Promise<void> {
+  async navigateItems(items: string[], selector: string, open?: (selector: string) => Promise<void>): Promise<void> {
     const logger = this.codeServer.logger.named(selector)
 
     /**
@@ -351,7 +339,7 @@ export class CodeServerPage {
       }
       this.codeServer.logger.debug(`watching ${selector}`)
       try {
-        await this.page.waitForSelector(`${selector}:not(:focus-within)`)
+        await this.page.locator(`${selector}:not(:focus-within)`).nth(0).waitFor()
       } catch (error) {
         if (!ctx.finished()) {
           this.codeServer.logger.debug(`${selector} navigation: ${(error as any).message || error}`)
@@ -368,7 +356,7 @@ export class CodeServerPage {
     const navigate = async (ctx: Context) => {
       const steps: Array<{ fn: () => Promise<unknown>; name: string }> = [
         {
-          fn: () => this.page.waitForSelector(`${selector}:focus-within`),
+          fn: () => this.page.locator(`${selector}:focus-within`).nth(0).waitFor(),
           name: "focus",
         },
       ]
@@ -382,19 +370,19 @@ export class CodeServerPage {
         // splitting them into two steps each we can cancel before running the
         // action.
         steps.push({
-          fn: () => this.page.hover(`${selector} :text("${item}")`, { trial: true }),
+          fn: () => this.page.locator(`${selector} :text("${item}")`).nth(0).hover({ trial: true }),
           name: `${item}:hover:trial`,
         })
         steps.push({
-          fn: () => this.page.hover(`${selector} :text("${item}")`, { force: true }),
+          fn: () => this.page.locator(`${selector} :text("${item}")`).nth(0).hover({ force: true }),
           name: `${item}:hover:force`,
         })
         steps.push({
-          fn: () => this.page.click(`${selector} :text("${item}")`, { trial: true }),
+          fn: () => this.page.locator(`${selector} :text("${item}")`).nth(0).click({ trial: true }),
           name: `${item}:click:trial`,
         })
         steps.push({
-          fn: () => this.page.click(`${selector} :text("${item}")`, { force: true }),
+          fn: () => this.page.locator(`${selector} :text("${item}")`).nth(0).click({ force: true }),
           name: `${item}:click:force`,
         })
       }
@@ -445,7 +433,7 @@ export class CodeServerPage {
    */
   async navigateMenus(menus: string[]): Promise<void> {
     await this.navigateItems(menus, '[aria-label="Application Menu"]', async (selector) => {
-      await this.page.click(selector)
+      await this.page.locator(selector).click()
     })
   }
 

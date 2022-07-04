@@ -8,7 +8,7 @@ function runTestExtensionTests() {
 
     await codeServerPage.executeCommandViaMenus("code-server: Get proxy URI")
 
-    await codeServerPage.page.waitForSelector(`text=${address}/proxy/{{port}}`)
+    await codeServerPage.page.locator(`text=${address}/proxy/{{port}}`).waitFor()
   })
 }
 

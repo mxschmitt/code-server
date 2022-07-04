@@ -26,22 +26,27 @@ export const describe = (
       await codeServer.close()
     })
 
-    const storageState = JSON.parse(process.env.STORAGE || "{}")
-
-    // Sanity check to ensure the cookie is set.
-    const cookies = storageState?.cookies
-    if (includeCredentials && (!cookies || cookies.length !== 1 || !!cookies[0].key)) {
-      logger.error("no cookies", field("storage", JSON.stringify(cookies)))
-      throw new Error("no credentials to include")
-    }
-
     test.use({
       // Makes `codeServer` and `authenticated` available to the extend call
       // below.
       codeServer,
       authenticated: includeCredentials,
       // This provides a cookie that authenticates with code-server.
-      storageState: includeCredentials ? storageState : {},
+      storageState: includeCredentials
+        ? // eslint-disable-next-line no-empty-pattern
+          async ({}, use) => {
+            const storageState = JSON.parse(process.env.STORAGE || "{}")
+
+            // Sanity check to ensure the cookie is set.
+            const cookies = storageState?.cookies
+            if (includeCredentials && (!cookies || cookies.length !== 1 || !!cookies[0].key)) {
+              logger.error("no cookies", field("storage", JSON.stringify(cookies)))
+              throw new Error("no credentials to include")
+            }
+            await use(storageState)
+          }
+        : undefined,
+
       // NOTE@jsjoeio some tests use --cert which uses a self-signed certificate
       // without this option, those tests will fail.
       ignoreHTTPSErrors: true,
@@ -65,11 +70,6 @@ export const test = base.extend<TestFixtures>({
   authenticated: false,
   codeServer: undefined, // No default; should be provided through `test.use`.
   codeServerPage: async ({ authenticated, codeServer, page }, use) => {
-    // It's possible code-server might prevent navigation because of unsaved
-    // changes (seems to happen based on timing even if no changes have been
-    // made too). In these cases just accept.
-    page.on("dialog", (d) => d.accept())
-
     const codeServerPage = new CodeServerPage(codeServer, page, authenticated)
     await codeServerPage.navigate()
     await use(codeServerPage)

@@ -1,4 +1,4 @@
-import { Cookie } from "playwright"
+import { Cookie } from "@playwright/test"
 import { CookieKeys } from "../../src/common/http"
 import { hash } from "../../src/node/util"
 import { PASSWORD, workspaceDir } from "./constants"

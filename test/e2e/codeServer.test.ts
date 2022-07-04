@@ -52,12 +52,12 @@ describe("code-server", true, [], {}, () => {
   })
 
   test("should always see the code-server editor", async ({ codeServerPage }) => {
-    expect(await codeServerPage.isEditorVisible()).toBe(true)
+    await expect(codeServerPage.editor).toBeVisible()
   })
 
   test("should show the Integrated Terminal", async ({ codeServerPage }) => {
     await codeServerPage.focusTerminal()
-    expect(await codeServerPage.page.isVisible("#terminal")).toBe(true)
+    await expect(codeServerPage.page.locator("#terminal")).toBeVisible()
   })
 
   test("should open a file", async ({ codeServerPage }) => {
@@ -92,7 +92,7 @@ describe("code-server", true, [], {}, () => {
     const address = new URL(await cs.address())
     await codeServerPage.navigate("/proxy/" + address.port + "/")
     await codeServerPage.openFile(files[1])
-    expect(await codeServerPage.tabIsVisible(files[0])).toBe(false)
+    await expect(codeServerPage.tabLocator(files[0])).toBeHidden()
     await codeServerPage.stateFlush()
 
     // Move back to latest code-server.  We should see the file we previously
@@ -100,17 +100,17 @@ describe("code-server", true, [], {}, () => {
     // already created its own database on this path and will avoid migrating.
     await codeServerPage.navigate()
     await codeServerPage.waitForTab(files[0])
-    expect(await codeServerPage.tabIsVisible(files[1])).toBe(false)
+    await expect(codeServerPage.tabLocator(files[1])).toBeHidden()
 
     // Open a new path in latest code-server.  This one should migrate the
     // database from old code-server but see nothing from the new database
     // created on the root.
     await codeServerPage.navigate("/vscode")
     await codeServerPage.waitForTab(files[1])
-    expect(await codeServerPage.tabIsVisible(files[0])).toBe(false)
+    await expect(codeServerPage.tabLocator(files[0])).toBeHidden()
     // Should still be open after a reload.
     await codeServerPage.navigate("/vscode")
     await codeServerPage.waitForTab(files[1])
-    expect(await codeServerPage.tabIsVisible(files[0])).toBe(false)
+    await expect(codeServerPage.tabLocator(files[0])).toBeHidden()
   })
 })

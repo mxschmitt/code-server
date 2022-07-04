@@ -5,6 +5,6 @@ import { describe, test, expect } from "./baseFixture"
 describe("globalSetup", true, [], {}, () => {
   test("should keep us logged in using the storageState", async ({ codeServerPage }) => {
     // Make sure the editor actually loaded
-    expect(await codeServerPage.isEditorVisible()).toBe(true)
+    await expect(codeServerPage.editor).toBeVisible()
   })
 })
